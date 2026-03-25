@@ -286,8 +286,8 @@ function updateGameState() {
     if (owner?.active && owner.pinching) {
       ball.x = THREE.MathUtils.lerp(ball.x, owner.smoothX, 0.34);
       ball.y = THREE.MathUtils.lerp(ball.y, owner.smoothY, 0.34);
-      ball.vx = owner.velocityX * 1.6;
-      ball.vy = owner.velocityY * 1.6;
+      ball.vx = owner.velocityX * 1.15;
+      ball.vy = owner.velocityY * 1.15;
       ball.pulse = THREE.MathUtils.lerp(ball.pulse, 1, 0.14);
 
       const opponent = players.find((player) => player.id !== owner.id);
@@ -309,8 +309,8 @@ function updateGameState() {
       }
     } else {
       if (owner) {
-        ball.vx = THREE.MathUtils.clamp(owner.velocityX * 2.8, -0.09, 0.09);
-        ball.vy = THREE.MathUtils.clamp(owner.velocityY * 2.8, -0.09, 0.09);
+        ball.vx = THREE.MathUtils.clamp(owner.velocityX * 1.85, -0.06, 0.06);
+        ball.vy = THREE.MathUtils.clamp(owner.velocityY * 1.85, -0.06, 0.06);
       }
       gameState.owner = null;
       setMessage("Throw released. The energy orb is gliding freely.");
@@ -337,8 +337,8 @@ function updateGameState() {
     } else {
       ball.x += ball.vx;
       ball.y += ball.vy;
-      ball.vx *= 0.96;
-      ball.vy *= 0.96;
+      ball.vx *= 0.9;
+      ball.vy *= 0.9;
 
       if (Math.abs(ball.vx) < 0.0004) ball.vx = 0;
       if (Math.abs(ball.vy) < 0.0004) ball.vy = 0;

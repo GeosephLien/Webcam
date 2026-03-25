@@ -31,14 +31,14 @@ body {
 
 .app-shell {
   display: grid;
-  grid-template-columns: minmax(210px, 260px) minmax(520px, 1fr);
-  gap: 22px;
+  place-items: center;
   min-height: 100vh;
   padding: 20px;
 }
 
 body.is-webcam-active .app-shell {
-  grid-template-columns: minmax(180px, 210px) minmax(640px, 1fr);
+  place-items: stretch;
+  padding: 0;
 }
 
 .hero-copy,
@@ -53,8 +53,14 @@ body.is-webcam-active .app-shell {
 }
 
 .hero-copy {
+  width: min(100%, 420px);
   padding: 22px;
   transition: padding 220ms ease, transform 220ms ease, opacity 220ms ease;
+}
+
+.stage-panel {
+  display: none;
+  width: 100%;
 }
 
 .hero-copy::before,
@@ -137,7 +143,7 @@ button:hover {
 }
 
 body.is-webcam-active .hero-copy {
-  padding: 16px;
+  display: none;
 }
 
 body.is-webcam-active h1 {
@@ -164,7 +170,12 @@ body.is-webcam-active .controls {
 }
 
 body.is-webcam-active .stage-panel {
+  display: block;
   min-height: 680px;
+  height: 100vh;
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
 }
 
 .hud {
@@ -244,6 +255,12 @@ body.is-webcam-active .stage-panel {
   border-radius: 28px;
 }
 
+body.is-webcam-active #scene canvas,
+body.is-webcam-active #overlay,
+body.is-webcam-active #webcam {
+  border-radius: 0;
+}
+
 #webcam {
   object-fit: cover;
   transform: scaleX(-1);
@@ -262,10 +279,14 @@ body.is-webcam-active .stage-panel {
 
 @media (max-width: 980px) {
   .app-shell {
-    grid-template-columns: 1fr;
+    place-items: center;
   }
 
   .stage-panel {
     min-height: 72vh;
+  }
+
+  body.is-webcam-active .app-shell {
+    place-items: stretch;
   }
 }
