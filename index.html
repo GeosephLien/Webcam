@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,18 +13,18 @@
   <div class="app-shell">
     <div class="hero-copy">
       <p class="eyebrow">Webcam Spatial Interface</p>
-      <h1>雙人搶球 3D Webcam 遊戲</h1>
+      <h1>Two-Player 3D Webcam Ball Game</h1>
       <p class="lede">
-        兩個人站在鏡頭前，各伸出一隻手。捏住中央能量球後甩向自己的得分區；對手也能捏住抄截。
+        Two players stand in front of the camera and each use one hand. Pinch the energy orb in the center, then fling it toward your scoring zone. Your opponent can also grab it and steal control.
       </p>
       <div class="controls">
-        <button id="startButton" type="button">啟動 Webcam 偵測</button>
-        <p id="statusText">等待啟動攝影機</p>
+        <button id="startButton" type="button">Start Webcam Tracking</button>
+        <p id="statusText">Waiting to start the camera</p>
       </div>
       <ul class="tips">
-        <li>左半邊是 P1，右半邊是 P2。</li>
-        <li>捏合可抓球，放開時會依手勢速度甩出。</li>
-        <li>把球送進自己的得分區就能得 1 分。</li>
+        <li>The left side is P1, and the right side is P2.</li>
+        <li>Pinch to grab the ball. Release to throw it based on your hand speed.</li>
+        <li>Send the ball into your own scoring zone to earn 1 point.</li>
       </ul>
     </div>
 
@@ -43,7 +43,7 @@
           <strong id="scoreRight">0</strong>
         </div>
       </div>
-      <p id="gameMessage" class="game-message">兩位玩家就位後，先捏住能量球的人取得控制權。</p>
+      <p id="gameMessage" class="game-message">Once both players are ready, whoever grabs the energy orb first takes control.</p>
       <video id="webcam" playsinline muted></video>
       <canvas id="overlay"></canvas>
       <div id="scene"></div>
