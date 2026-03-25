@@ -79,6 +79,7 @@ gameState.scoreEffect = {
   side: "left",
   color: "rgba(110, 242, 255, 1)"
 };
+gameState.hadTrackedHands = false;
 
 const threeState = initThreeScene(sceneRoot);
 
@@ -172,6 +173,8 @@ function animationLoop() {
 }
 
 function handleDetectionResult(result) {
+  const hadTrackedHands = gameState.hadTrackedHands;
+
   for (const player of players) {
     player.hand = null;
     player.active = false;
@@ -197,35 +200,49 @@ function handleDetectionResult(result) {
   }
 
   const remainingHands = [...detectedHands];
-  const playerOrder =
-    remainingHands.length > 1
-      ? [...players].sort(
-          (a, b) =>
-            Math.min(...remainingHands.map((hand) => distance(a.smoothX, a.smoothY, hand.x, hand.y))) -
-            Math.min(...remainingHands.map((hand) => distance(b.smoothX, b.smoothY, hand.x, hand.y)))
-        )
-      : players;
+  if (!hadTrackedHands) {
+    remainingHands.sort((a, b) => a.x - b.x);
 
-  for (const player of playerOrder) {
-    if (!remainingHands.length) break;
+    for (const hand of remainingHands) {
+      const player = hand.x < 0.5 ? players[0] : players[1];
+      if (player.active) continue;
 
-    let bestIndex = 0;
-    let bestDistance = Infinity;
-
-    for (let i = 0; i < remainingHands.length; i++) {
-      const hand = remainingHands[i];
-      const d = distance(player.smoothX, player.smoothY, hand.x, hand.y);
-      if (d < bestDistance) {
-        bestDistance = d;
-        bestIndex = i;
-      }
+      player.hand = { x: hand.x, y: hand.y, landmarks: hand.landmarks };
+      player.active = true;
+      player.pinch = hand.pinch;
+      player.pinching = hand.pinch > 0.58;
     }
+  } else {
+    const playerOrder =
+      remainingHands.length > 1
+        ? [...players].sort(
+            (a, b) =>
+              Math.min(...remainingHands.map((hand) => distance(a.smoothX, a.smoothY, hand.x, hand.y))) -
+              Math.min(...remainingHands.map((hand) => distance(b.smoothX, b.smoothY, hand.x, hand.y)))
+          )
+        : players;
 
-    const [hand] = remainingHands.splice(bestIndex, 1);
-    player.hand = { x: hand.x, y: hand.y, landmarks: hand.landmarks };
-    player.active = true;
-    player.pinch = hand.pinch;
-    player.pinching = hand.pinch > 0.58;
+    for (const player of playerOrder) {
+      if (!remainingHands.length) break;
+
+      let bestIndex = 0;
+      let bestDistance = Infinity;
+
+      for (let i = 0; i < remainingHands.length; i++) {
+        const hand = remainingHands[i];
+        const d = distance(player.smoothX, player.smoothY, hand.x, hand.y);
+        if (d < bestDistance) {
+          bestDistance = d;
+          bestIndex = i;
+        }
+      }
+
+      const [hand] = remainingHands.splice(bestIndex, 1);
+      player.hand = { x: hand.x, y: hand.y, landmarks: hand.landmarks };
+      player.active = true;
+      player.pinch = hand.pinch;
+      player.pinching = hand.pinch > 0.58;
+    }
   }
 
   for (const player of players) {
@@ -248,6 +265,7 @@ function handleDetectionResult(result) {
   }
 
   const activeCount = players.filter((player) => player.active).length;
+  gameState.hadTrackedHands = activeCount > 0;
   gestureText.textContent = activeCount === 2 ? "2 PLAYERS" : activeCount === 1 ? "1 PLAYER" : "NO HAND";
 }
 
@@ -490,15 +508,41 @@ function drawPlayerHand(player) {
   overlayCtx.restore();
 }
 
+function getBallPalette() {
+  const owner = players.find((player) => player.id === gameState.owner);
+  if (!owner) {
+    return {
+      core: "#fff4aa",
+      glow: "rgba(110, 242, 255, 0.34)",
+      outer: "rgba(110, 242, 255, 0)"
+    };
+  }
+
+  if (owner.id === "P1") {
+    return {
+      core: "#6ef2ff",
+      glow: "rgba(110, 242, 255, 0.45)",
+      outer: "rgba(110, 242, 255, 0)"
+    };
+  }
+
+  return {
+    core: "#ff8ea1",
+    glow: "rgba(255, 142, 161, 0.45)",
+    outer: "rgba(255, 142, 161, 0)"
+  };
+}
+
 function drawBallOverlay() {
   const ballX = gameState.ball.smoothX * overlay.width;
   const ballY = gameState.ball.smoothY * overlay.height;
   const glow = (28 + gameState.ball.pulse * 28) * BALL_SCALE;
+  const palette = getBallPalette();
 
   const radial = overlayCtx.createRadialGradient(ballX, ballY, 0, ballX, ballY, glow);
-  radial.addColorStop(0, "rgba(255, 244, 170, 0.8)");
-  radial.addColorStop(0.45, "rgba(110, 242, 255, 0.34)");
-  radial.addColorStop(1, "rgba(110, 242, 255, 0)");
+  radial.addColorStop(0, palette.core);
+  radial.addColorStop(0.45, palette.glow);
+  radial.addColorStop(1, palette.outer);
   overlayCtx.fillStyle = radial;
   overlayCtx.beginPath();
   overlayCtx.arc(ballX, ballY, glow, 0, Math.PI * 2);
@@ -642,6 +686,7 @@ function initThreeScene(container) {
     const elapsed = clock.getElapsedTime();
     controls.enabled = false;
     controls.update();
+    const palette = getBallPalette();
 
     ballGroup.position.x = THREE.MathUtils.lerp(ballGroup.position.x, (gameState.ball.smoothX - 0.5) * 6, 0.18);
     ballGroup.position.y = THREE.MathUtils.lerp(ballGroup.position.y, (0.5 - gameState.ball.smoothY) * 3.4, 0.18);
@@ -653,6 +698,9 @@ function initThreeScene(container) {
     core.rotation.y += 0.012;
     wire.rotation.x -= 0.005;
     wire.rotation.y += 0.008;
+    core.material.color.set(palette.core);
+    core.material.emissive.set(palette.core);
+    wire.material.color.set(palette.core);
     core.material.emissiveIntensity = 1.2 + gameState.ball.pulse * 1.4;
 
     particles.rotation.y = elapsed * 0.06;
