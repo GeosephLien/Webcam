@@ -72,6 +72,14 @@ const gameState = {
   lastMessage: "兩位玩家就位後，先捏住能量球的人取得控制權。"
 };
 
+gameState.scoreEffect = {
+  active: false,
+  timer: 0,
+  duration: 42,
+  side: "left",
+  color: "rgba(110, 242, 255, 1)"
+};
+
 const threeState = initThreeScene(sceneRoot);
 
 statusText.textContent = "互動模組已載入，點擊按鈕啟動攝影機";
@@ -219,6 +227,13 @@ function handleDetectionResult(result) {
 function updateGameState() {
   const { ball } = gameState;
   if (ball.stealCooldown > 0) ball.stealCooldown -= 1;
+  if (gameState.scoreEffect.active) {
+    gameState.scoreEffect.timer += 1;
+    if (gameState.scoreEffect.timer >= gameState.scoreEffect.duration) {
+      gameState.scoreEffect.active = false;
+      gameState.scoreEffect.timer = 0;
+    }
+  }
 
   if (gameState.owner) {
     const owner = players.find((player) => player.id === gameState.owner);
@@ -328,6 +343,7 @@ function scorePoint(player) {
   player.score += 1;
   scoreLeft.textContent = String(players[0].score);
   scoreRight.textContent = String(players[1].score);
+  triggerScoreEffect(player);
   setMessage(`${player.id} 得分，目前比數 ${players[0].score} : ${players[1].score}`);
   gameState.owner = null;
   gameState.ball.x = 0.5;
@@ -338,6 +354,13 @@ function scorePoint(player) {
   gameState.ball.stealCooldown = 24;
   gameState.ball.vx = 0;
   gameState.ball.vy = 0;
+}
+
+function triggerScoreEffect(player) {
+  gameState.scoreEffect.active = true;
+  gameState.scoreEffect.timer = 0;
+  gameState.scoreEffect.side = player.side;
+  gameState.scoreEffect.color = player.side === "left" ? "rgba(110, 242, 255, 1)" : "rgba(255, 142, 161, 1)";
 }
 
 function setMessage(text) {
@@ -351,6 +374,7 @@ function drawOverlay() {
 
   drawGoalZone(0, "rgba(110, 242, 255, 0.12)");
   drawGoalZone(overlay.width * 0.88, "rgba(255, 142, 161, 0.12)");
+  drawScoreEffect();
 
   for (const player of players) {
     if (!player.hand) continue;
@@ -363,6 +387,47 @@ function drawOverlay() {
 function drawGoalZone(x, color) {
   overlayCtx.fillStyle = color;
   overlayCtx.fillRect(x, 0, overlay.width * 0.12, overlay.height);
+}
+
+function drawScoreEffect() {
+  const effect = gameState.scoreEffect;
+  if (!effect?.active) return;
+
+  const progress = effect.timer / effect.duration;
+  const fade = 1 - Math.min(1, progress);
+  const zoneWidth = overlay.width * 0.12;
+  const centerX = effect.side === "left" ? zoneWidth * 0.5 : overlay.width - zoneWidth * 0.5;
+  const centerY = overlay.height * 0.5;
+  const flashWidth = overlay.width * (0.18 + progress * 0.18);
+  const ringRadius = Math.min(overlay.width, overlay.height) * (0.08 + progress * 0.28);
+
+  overlayCtx.save();
+  overlayCtx.globalAlpha = 0.34 * fade;
+  overlayCtx.fillStyle = effect.color;
+  overlayCtx.fillRect(effect.side === "left" ? 0 : overlay.width - flashWidth, 0, flashWidth, overlay.height);
+
+  overlayCtx.globalAlpha = 1;
+  overlayCtx.lineWidth = 8 * fade + 2;
+  overlayCtx.strokeStyle = effect.color.replace(", 1)", `, ${0.8 * fade})`);
+  overlayCtx.beginPath();
+  overlayCtx.arc(centerX, centerY, ringRadius, 0, Math.PI * 2);
+  overlayCtx.stroke();
+
+  const radial = overlayCtx.createRadialGradient(centerX, centerY, 0, centerX, centerY, ringRadius * 1.8);
+  radial.addColorStop(0, effect.color.replace(", 1)", `, ${0.34 * fade})`));
+  radial.addColorStop(0.45, effect.color.replace(", 1)", `, ${0.2 * fade})`));
+  radial.addColorStop(1, effect.color.replace(", 1)", ", 0)"));
+  overlayCtx.fillStyle = radial;
+  overlayCtx.beginPath();
+  overlayCtx.arc(centerX, centerY, ringRadius * 1.8, 0, Math.PI * 2);
+  overlayCtx.fill();
+
+  overlayCtx.font = `700 ${Math.round(42 + progress * 18)}px "Space Grotesk", sans-serif`;
+  overlayCtx.textAlign = "center";
+  overlayCtx.textBaseline = "middle";
+  overlayCtx.fillStyle = `rgba(236, 251, 255, ${0.9 * fade})`;
+  overlayCtx.fillText("SCORE!", centerX, centerY);
+  overlayCtx.restore();
 }
 
 function drawPlayerHand(player) {
