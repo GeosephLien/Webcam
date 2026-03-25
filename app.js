@@ -20,6 +20,7 @@ const BALL_SCALE = 0.5;
 const PINCH_GRAB_THRESHOLD = 0.58;
 const PINCH_HOLD_THRESHOLD = 0.35;
 const PINCH_RELEASE_GRACE_FRAMES = 12;
+const STEAL_PROTECTION_FRAMES = 18;
 const BALL_RETURN_DELAY_FRAMES = 180;
 const BALL_RETURN_LERP = 0.012;
 
@@ -186,7 +187,10 @@ function animationLoop() {
 }
 
 function handleDetectionResult(result) {
+  const previousPinching = new Map(players.map((player) => [player.id, player.pinching]));
+
   for (const player of players) {
+    player.justPinched = false;
     player.hand = null;
     player.active = false;
     player.pinch = 0;
@@ -226,7 +230,7 @@ function handleDetectionResult(result) {
       hand.handedness === "Left" ? players[0] : hand.handedness === "Right" ? players[1] : null;
     if (!player || player.active) continue;
 
-    const wasPinching = player.pinching;
+    const wasPinching = previousPinching.get(player.id) ?? false;
     player.hand = {
       x: hand.x,
       y: hand.y,
@@ -237,6 +241,7 @@ function handleDetectionResult(result) {
     player.active = true;
     player.pinch = hand.pinch;
     player.pinching = hand.pinch > (wasPinching ? PINCH_HOLD_THRESHOLD : PINCH_GRAB_THRESHOLD);
+    player.justPinched = player.pinching && !wasPinching;
     remainingHands.splice(remainingHands.indexOf(hand), 1);
   }
 
@@ -266,7 +271,7 @@ function handleDetectionResult(result) {
       }
 
       const [hand] = remainingHands.splice(bestIndex, 1);
-      const wasPinching = player.pinching;
+      const wasPinching = previousPinching.get(player.id) ?? false;
       player.hand = {
         x: hand.x,
         y: hand.y,
@@ -277,6 +282,7 @@ function handleDetectionResult(result) {
       player.active = true;
       player.pinch = hand.pinch;
       player.pinching = hand.pinch > (wasPinching ? PINCH_HOLD_THRESHOLD : PINCH_GRAB_THRESHOLD);
+      player.justPinched = player.pinching && !wasPinching;
     }
   }
 
@@ -334,12 +340,12 @@ function updateGameState() {
       const opponent = players.find((player) => player.id !== owner.id);
       if (
         opponent?.active &&
-        opponent.pinching &&
+        opponent.justPinched &&
         distance(opponent.smoothX, opponent.smoothY, ball.x, ball.y) < 0.09 &&
         ball.stealCooldown <= 0
       ) {
         gameState.owner = opponent.id;
-        ball.stealCooldown = 18;
+        ball.stealCooldown = STEAL_PROTECTION_FRAMES;
         setMessage(`${opponent.id} stole the orb and took control.`);
       }
 
@@ -375,7 +381,7 @@ function updateGameState() {
       gameState.owner = closestPlayer.id;
       ball.holdGrace = PINCH_RELEASE_GRACE_FRAMES;
       ball.idleFrames = 0;
-      ball.stealCooldown = 12;
+      ball.stealCooldown = STEAL_PROTECTION_FRAMES;
       ball.vx = 0;
       ball.vy = 0;
       setMessage(`${closestPlayer.id} grabbed the energy orb. Throw it toward your scoring zone.`);
