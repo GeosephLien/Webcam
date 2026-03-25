@@ -417,8 +417,6 @@ function setMessage(text) {
 function drawOverlay() {
   overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
 
-  drawGoalZone(0, "rgba(110, 242, 255, 0.12)");
-  drawGoalZone(overlay.width * 0.88, "rgba(255, 142, 161, 0.12)");
   drawScoreEffect();
 
   for (const player of players) {
@@ -427,11 +425,6 @@ function drawOverlay() {
   }
 
   drawBallOverlay();
-}
-
-function drawGoalZone(x, color) {
-  overlayCtx.fillStyle = color;
-  overlayCtx.fillRect(x, 0, overlay.width * 0.12, overlay.height);
 }
 
 function drawScoreEffect() {
@@ -702,8 +695,8 @@ function initThreeScene(container) {
       marker.material.opacity = player.active ? 0.95 : 0.18;
     });
 
-    leftGate.material.opacity = players[0].active ? 0.34 : 0.16;
-    rightGate.material.opacity = players[1].active ? 0.34 : 0.16;
+    leftGate.material.opacity = 0;
+    rightGate.material.opacity = 0;
 
     renderer.render(scene, camera);
   }
