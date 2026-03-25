@@ -15,6 +15,7 @@ const sceneRoot = document.getElementById("scene");
 const scoreLeft = document.getElementById("scoreLeft");
 const scoreRight = document.getElementById("scoreRight");
 const gameMessage = document.getElementById("gameMessage");
+const BALL_SCALE = 0.5;
 
 let handLandmarker;
 let animationFrameId = null;
@@ -400,7 +401,7 @@ function drawPlayerHand(player) {
 function drawBallOverlay() {
   const ballX = gameState.ball.smoothX * overlay.width;
   const ballY = gameState.ball.smoothY * overlay.height;
-  const glow = 28 + gameState.ball.pulse * 28;
+  const glow = (28 + gameState.ball.pulse * 28) * BALL_SCALE;
 
   const radial = overlayCtx.createRadialGradient(ballX, ballY, 0, ballX, ballY, glow);
   radial.addColorStop(0, "rgba(255, 244, 170, 0.8)");
@@ -449,7 +450,7 @@ function initThreeScene(container) {
   scene.add(ballGroup);
 
   const core = new THREE.Mesh(
-    new THREE.IcosahedronGeometry(0.88, 3),
+    new THREE.IcosahedronGeometry(0.44, 3),
     new THREE.MeshPhysicalMaterial({
       color: 0xfff4aa,
       emissive: 0x2fe3ff,
@@ -465,7 +466,7 @@ function initThreeScene(container) {
   ballGroup.add(core);
 
   const wire = new THREE.Mesh(
-    new THREE.IcosahedronGeometry(1.18, 1),
+    new THREE.IcosahedronGeometry(0.59, 1),
     new THREE.MeshBasicMaterial({
       color: 0x72f0ff,
       wireframe: true,
