@@ -612,14 +612,14 @@ function initThreeScene(container) {
   });
 
   const leftGate = new THREE.Mesh(
-    new THREE.BoxGeometry(0.18, 3.8, 1.6),
+    new THREE.BoxGeometry(0.14, 3.1, 1.2),
     new THREE.MeshBasicMaterial({ color: 0x6ef2ff, transparent: true, opacity: 0.22 })
   );
   leftGate.position.set(-3.05, 0, 0);
   scene.add(leftGate);
 
   const rightGate = new THREE.Mesh(
-    new THREE.BoxGeometry(0.18, 3.8, 1.6),
+    new THREE.BoxGeometry(0.14, 3.1, 1.2),
     new THREE.MeshBasicMaterial({ color: 0xff8ea1, transparent: true, opacity: 0.22 })
   );
   rightGate.position.set(3.05, 0, 0);
