@@ -179,9 +179,9 @@ function handleDetectionResult(result) {
     player.pinching = false;
   }
 
-  const hands = result.landmarks ?? [];
+  const detectedHands = [];
 
-  for (const landmarks of hands) {
+  for (const landmarks of result.landmarks ?? []) {
     const indexTip = landmarks[8];
     const thumbTip = landmarks[4];
     const handX = 1 - indexTip.x;
@@ -192,13 +192,40 @@ function handleDetectionResult(result) {
       (indexTip.z ?? 0) - (thumbTip.z ?? 0)
     );
     const pinch = THREE.MathUtils.clamp(1 - pinchDistance * 8, 0, 1);
-    const sideIndex = handX < 0.5 ? 0 : 1;
-    const player = players[sideIndex];
 
-    player.hand = { x: handX, y: handY, landmarks };
+    detectedHands.push({ x: handX, y: handY, landmarks, pinch });
+  }
+
+  const remainingHands = [...detectedHands];
+  const playerOrder =
+    remainingHands.length > 1
+      ? [...players].sort(
+          (a, b) =>
+            Math.min(...remainingHands.map((hand) => distance(a.smoothX, a.smoothY, hand.x, hand.y))) -
+            Math.min(...remainingHands.map((hand) => distance(b.smoothX, b.smoothY, hand.x, hand.y)))
+        )
+      : players;
+
+  for (const player of playerOrder) {
+    if (!remainingHands.length) break;
+
+    let bestIndex = 0;
+    let bestDistance = Infinity;
+
+    for (let i = 0; i < remainingHands.length; i++) {
+      const hand = remainingHands[i];
+      const d = distance(player.smoothX, player.smoothY, hand.x, hand.y);
+      if (d < bestDistance) {
+        bestDistance = d;
+        bestIndex = i;
+      }
+    }
+
+    const [hand] = remainingHands.splice(bestIndex, 1);
+    player.hand = { x: hand.x, y: hand.y, landmarks: hand.landmarks };
     player.active = true;
-    player.pinch = pinch;
-    player.pinching = pinch > 0.58;
+    player.pinch = hand.pinch;
+    player.pinching = hand.pinch > 0.58;
   }
 
   for (const player of players) {
