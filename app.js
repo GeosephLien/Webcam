@@ -173,8 +173,6 @@ function animationLoop() {
 }
 
 function handleDetectionResult(result) {
-  const hadTrackedHands = gameState.hadTrackedHands;
-
   for (const player of players) {
     player.hand = null;
     player.active = false;
@@ -183,8 +181,9 @@ function handleDetectionResult(result) {
   }
 
   const detectedHands = [];
+  const handednessList = result.handednesses ?? [];
 
-  for (const landmarks of result.landmarks ?? []) {
+  for (const [index, landmarks] of (result.landmarks ?? []).entries()) {
     const indexTip = landmarks[8];
     const thumbTip = landmarks[4];
     const handX = 1 - indexTip.x;
@@ -195,24 +194,25 @@ function handleDetectionResult(result) {
       (indexTip.z ?? 0) - (thumbTip.z ?? 0)
     );
     const pinch = THREE.MathUtils.clamp(1 - pinchDistance * 8, 0, 1);
+    const handedness = handednessList[index]?.[0]?.categoryName ?? null;
 
-    detectedHands.push({ x: handX, y: handY, landmarks, pinch });
+    detectedHands.push({ x: handX, y: handY, landmarks, pinch, handedness });
   }
 
   const remainingHands = [...detectedHands];
-  if (!hadTrackedHands) {
-    remainingHands.sort((a, b) => a.x - b.x);
+  for (const hand of [...remainingHands]) {
+    const player =
+      hand.handedness === "Left" ? players[0] : hand.handedness === "Right" ? players[1] : null;
+    if (!player || player.active) continue;
 
-    for (const hand of remainingHands) {
-      const player = hand.x < 0.5 ? players[0] : players[1];
-      if (player.active) continue;
+    player.hand = { x: hand.x, y: hand.y, landmarks: hand.landmarks };
+    player.active = true;
+    player.pinch = hand.pinch;
+    player.pinching = hand.pinch > 0.58;
+    remainingHands.splice(remainingHands.indexOf(hand), 1);
+  }
 
-      player.hand = { x: hand.x, y: hand.y, landmarks: hand.landmarks };
-      player.active = true;
-      player.pinch = hand.pinch;
-      player.pinching = hand.pinch > 0.58;
-    }
-  } else {
+  if (remainingHands.length) {
     const playerOrder =
       remainingHands.length > 1
         ? [...players].sort(
@@ -223,7 +223,7 @@ function handleDetectionResult(result) {
         : players;
 
     for (const player of playerOrder) {
-      if (!remainingHands.length) break;
+      if (!remainingHands.length || player.active) continue;
 
       let bestIndex = 0;
       let bestDistance = Infinity;
@@ -489,22 +489,8 @@ function drawPlayerHand(player) {
     overlayCtx.fill();
   }
 
-  const px = player.smoothX * overlay.width;
-  const py = player.smoothY * overlay.height;
-  overlayCtx.beginPath();
-  overlayCtx.arc(px, py, 26, 0, Math.PI * 2);
-  overlayCtx.stroke();
-
-  if (player.pinching) {
-    overlayCtx.globalAlpha = 0.22 + player.pinch * 0.32;
-    overlayCtx.beginPath();
-    overlayCtx.arc(px, py, 40, 0, Math.PI * 2);
-    overlayCtx.fill();
-    overlayCtx.globalAlpha = 1;
-  }
-
   overlayCtx.font = "700 18px 'Space Grotesk', sans-serif";
-  overlayCtx.fillText(player.id, px - 12, py - 34);
+  overlayCtx.fillText(player.id, player.smoothX * overlay.width - 12, player.smoothY * overlay.height - 34);
   overlayCtx.restore();
 }
 
