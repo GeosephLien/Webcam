@@ -99,6 +99,7 @@ startButton.addEventListener("click", async () => {
     await ensureLandmarker();
     await setupCamera();
     resizeOverlay();
+    requestAnimationFrame(() => threeState.resize());
     statusText.textContent = "Two-player tracking is active.";
     startButton.textContent = "Webcam Active";
     animationLoop();
@@ -608,14 +609,14 @@ function initThreeScene(container) {
     new THREE.BoxGeometry(0.14, 3.1, 1.2),
     new THREE.MeshBasicMaterial({ color: 0x6ef2ff, transparent: true, opacity: 0.22 })
   );
-  leftGate.position.set(-3.05, 0, 0);
+  leftGate.position.set(-3.28, 0, 0);
   scene.add(leftGate);
 
   const rightGate = new THREE.Mesh(
     new THREE.BoxGeometry(0.14, 3.1, 1.2),
     new THREE.MeshBasicMaterial({ color: 0xff8ea1, transparent: true, opacity: 0.22 })
   );
-  rightGate.position.set(3.05, 0, 0);
+  rightGate.position.set(3.28, 0, 0);
   scene.add(rightGate);
 
   const particlesGeometry = new THREE.BufferGeometry();
@@ -667,8 +668,8 @@ function initThreeScene(container) {
     controls.update();
     const palette = getBallPalette();
 
-    ballGroup.position.x = THREE.MathUtils.lerp(ballGroup.position.x, (gameState.ball.smoothX - 0.5) * 6, 0.18);
-    ballGroup.position.y = THREE.MathUtils.lerp(ballGroup.position.y, (0.5 - gameState.ball.smoothY) * 3.4, 0.18);
+    ballGroup.position.x = (gameState.ball.smoothX - 0.5) * 6;
+    ballGroup.position.y = (0.5 - gameState.ball.smoothY) * 3.4;
 
     const pulseScale = 1 + gameState.ball.pulse * 0.34;
     ballGroup.scale.setScalar(THREE.MathUtils.lerp(ballGroup.scale.x, pulseScale, 0.12));
