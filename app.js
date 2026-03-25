@@ -15,7 +15,13 @@ const sceneRoot = document.getElementById("scene");
 const scoreLeft = document.getElementById("scoreLeft");
 const scoreRight = document.getElementById("scoreRight");
 const gameMessage = document.getElementById("gameMessage");
+const resetButton = document.getElementById("resetButton");
 const BALL_SCALE = 0.5;
+const PINCH_GRAB_THRESHOLD = 0.58;
+const PINCH_HOLD_THRESHOLD = 0.35;
+const PINCH_RELEASE_GRACE_FRAMES = 12;
+const BALL_RETURN_DELAY_FRAMES = 180;
+const BALL_RETURN_LERP = 0.012;
 
 let handLandmarker;
 let animationFrameId = null;
@@ -65,6 +71,8 @@ const gameState = {
     smoothX: 0.5,
     smoothY: 0.5,
     pulse: 0,
+    holdGrace: 0,
+    idleFrames: 0,
     stealCooldown: 0,
     vx: 0,
     vy: 0
@@ -88,6 +96,10 @@ statusText.textContent = "Interactive module loaded. Click the button to start t
 window.addEventListener("error", (event) => {
   if (!event.message) return;
   statusText.textContent = `Load failed: ${event.message}`;
+});
+
+resetButton.addEventListener("click", () => {
+  resetGame();
 });
 
 startButton.addEventListener("click", async () => {
@@ -187,8 +199,8 @@ function handleDetectionResult(result) {
   for (const [index, landmarks] of (result.landmarks ?? []).entries()) {
     const indexTip = landmarks[8];
     const thumbTip = landmarks[4];
-    const handX = 1 - indexTip.x;
-    const handY = indexTip.y;
+    const handX = 1 - (indexTip.x + thumbTip.x) * 0.5;
+    const handY = (indexTip.y + thumbTip.y) * 0.5;
     const pinchDistance = Math.hypot(
       indexTip.x - thumbTip.x,
       indexTip.y - thumbTip.y,
@@ -197,7 +209,15 @@ function handleDetectionResult(result) {
     const pinch = THREE.MathUtils.clamp(1 - pinchDistance * 8, 0, 1);
     const handedness = handednessList[index]?.[0]?.categoryName ?? null;
 
-    detectedHands.push({ x: handX, y: handY, landmarks, pinch, handedness });
+    detectedHands.push({
+      x: handX,
+      y: handY,
+      landmarks,
+      pinch,
+      handedness,
+      indexTip: { x: 1 - indexTip.x, y: indexTip.y },
+      thumbTip: { x: 1 - thumbTip.x, y: thumbTip.y }
+    });
   }
 
   const remainingHands = [...detectedHands];
@@ -206,10 +226,17 @@ function handleDetectionResult(result) {
       hand.handedness === "Left" ? players[0] : hand.handedness === "Right" ? players[1] : null;
     if (!player || player.active) continue;
 
-    player.hand = { x: hand.x, y: hand.y, landmarks: hand.landmarks };
+    const wasPinching = player.pinching;
+    player.hand = {
+      x: hand.x,
+      y: hand.y,
+      landmarks: hand.landmarks,
+      indexTip: hand.indexTip,
+      thumbTip: hand.thumbTip
+    };
     player.active = true;
     player.pinch = hand.pinch;
-    player.pinching = hand.pinch > 0.58;
+    player.pinching = hand.pinch > (wasPinching ? PINCH_HOLD_THRESHOLD : PINCH_GRAB_THRESHOLD);
     remainingHands.splice(remainingHands.indexOf(hand), 1);
   }
 
@@ -239,10 +266,17 @@ function handleDetectionResult(result) {
       }
 
       const [hand] = remainingHands.splice(bestIndex, 1);
-      player.hand = { x: hand.x, y: hand.y, landmarks: hand.landmarks };
+      const wasPinching = player.pinching;
+      player.hand = {
+        x: hand.x,
+        y: hand.y,
+        landmarks: hand.landmarks,
+        indexTip: hand.indexTip,
+        thumbTip: hand.thumbTip
+      };
       player.active = true;
       player.pinch = hand.pinch;
-      player.pinching = hand.pinch > 0.58;
+      player.pinching = hand.pinch > (wasPinching ? PINCH_HOLD_THRESHOLD : PINCH_GRAB_THRESHOLD);
     }
   }
 
@@ -284,7 +318,13 @@ function updateGameState() {
   if (gameState.owner) {
     const owner = players.find((player) => player.id === gameState.owner);
 
-    if (owner?.active && owner.pinching) {
+    if (owner?.active && (owner.pinching || ball.holdGrace > 0)) {
+      if (owner.pinching) {
+        ball.holdGrace = PINCH_RELEASE_GRACE_FRAMES;
+      } else {
+        ball.holdGrace -= 1;
+      }
+
       ball.x = THREE.MathUtils.lerp(ball.x, owner.smoothX, 0.34);
       ball.y = THREE.MathUtils.lerp(ball.y, owner.smoothY, 0.34);
       ball.vx = owner.velocityX * 1.15;
@@ -303,16 +343,18 @@ function updateGameState() {
         setMessage(`${opponent.id} stole the orb and took control.`);
       }
 
-      if (owner.side === "left" && ball.x < 0.12) {
+      if (owner.side === "left" && ball.x < 0.2) {
         scorePoint(owner);
-      } else if (owner.side === "right" && ball.x > 0.88) {
+      } else if (owner.side === "right" && ball.x > 0.8) {
         scorePoint(owner);
       }
     } else {
       if (owner) {
-        ball.vx = THREE.MathUtils.clamp(owner.velocityX * 1.85, -0.06, 0.06);
-        ball.vy = THREE.MathUtils.clamp(owner.velocityY * 1.85, -0.06, 0.06);
+        ball.vx = THREE.MathUtils.clamp(owner.velocityX * 1.35, -0.04, 0.04);
+        ball.vy = THREE.MathUtils.clamp(owner.velocityY * 1.35, -0.04, 0.04);
       }
+      ball.holdGrace = 0;
+      ball.idleFrames = 0;
       gameState.owner = null;
       setMessage("Throw released. The energy orb is gliding freely.");
     }
@@ -331,6 +373,8 @@ function updateGameState() {
 
     if (closestPlayer && closestPlayer.pinching && closestDistance < 0.095) {
       gameState.owner = closestPlayer.id;
+      ball.holdGrace = PINCH_RELEASE_GRACE_FRAMES;
+      ball.idleFrames = 0;
       ball.stealCooldown = 12;
       ball.vx = 0;
       ball.vy = 0;
@@ -338,8 +382,8 @@ function updateGameState() {
     } else {
       ball.x += ball.vx;
       ball.y += ball.vy;
-      ball.vx *= 0.9;
-      ball.vy *= 0.9;
+      ball.vx *= 0.8;
+      ball.vy *= 0.8;
 
       if (Math.abs(ball.vx) < 0.0004) ball.vx = 0;
       if (Math.abs(ball.vy) < 0.0004) ball.vy = 0;
@@ -352,25 +396,30 @@ function updateGameState() {
         ball.vy *= -0.72;
       }
 
-      if (ball.x < 0.12) {
+      if (ball.x < 0.2) {
         if (ball.vx < 0) {
           scorePoint(players[0]);
           return;
         }
-        ball.x = 0.12;
+        ball.x = 0.2;
         ball.vx *= -0.78;
-      } else if (ball.x > 0.88) {
+      } else if (ball.x > 0.8) {
         if (ball.vx > 0) {
           scorePoint(players[1]);
           return;
         }
-        ball.x = 0.88;
+        ball.x = 0.8;
         ball.vx *= -0.78;
       }
 
       if (ball.vx === 0 && ball.vy === 0) {
-        ball.x = THREE.MathUtils.lerp(ball.x, 0.5, 0.03);
-        ball.y = THREE.MathUtils.lerp(ball.y, 0.5, 0.03);
+        ball.idleFrames += 1;
+        if (ball.idleFrames >= BALL_RETURN_DELAY_FRAMES) {
+          ball.x = THREE.MathUtils.lerp(ball.x, 0.5, BALL_RETURN_LERP);
+          ball.y = THREE.MathUtils.lerp(ball.y, 0.5, BALL_RETURN_LERP);
+        }
+      } else {
+        ball.idleFrames = 0;
       }
 
       ball.pulse = THREE.MathUtils.lerp(
@@ -397,9 +446,34 @@ function scorePoint(player) {
   gameState.ball.smoothX = 0.5;
   gameState.ball.smoothY = 0.5;
   gameState.ball.pulse = 1.4;
+  gameState.ball.holdGrace = 0;
+  gameState.ball.idleFrames = 0;
   gameState.ball.stealCooldown = 24;
   gameState.ball.vx = 0;
   gameState.ball.vy = 0;
+}
+
+function resetGame() {
+  for (const player of players) {
+    player.score = 0;
+  }
+
+  scoreLeft.textContent = "0";
+  scoreRight.textContent = "0";
+  gameState.owner = null;
+  gameState.ball.x = 0.5;
+  gameState.ball.y = 0.5;
+  gameState.ball.smoothX = 0.5;
+  gameState.ball.smoothY = 0.5;
+  gameState.ball.pulse = 0;
+  gameState.ball.holdGrace = 0;
+  gameState.ball.idleFrames = 0;
+  gameState.ball.stealCooldown = 0;
+  gameState.ball.vx = 0;
+  gameState.ball.vy = 0;
+  gameState.scoreEffect.active = false;
+  gameState.scoreEffect.timer = 0;
+  setMessage("Score reset. Grab the energy orb to start the next round.");
 }
 
 function triggerScoreEffect(player) {
@@ -434,7 +508,7 @@ function drawScoreEffect() {
 
   const progress = effect.timer / effect.duration;
   const fade = 1 - Math.min(1, progress);
-  const zoneWidth = overlay.width * 0.12;
+  const zoneWidth = overlay.width * 0.2;
   const centerX = effect.side === "left" ? zoneWidth * 0.5 : overlay.width - zoneWidth * 0.5;
   const centerY = overlay.height * 0.5;
   const flashWidth = overlay.width * (0.18 + progress * 0.18);
@@ -483,6 +557,30 @@ function drawPlayerHand(player) {
     overlayCtx.fill();
   }
 
+  if (player.pinching) {
+    const tips = [player.hand.indexTip, player.hand.thumbTip];
+    const glowCore = player.side === "left" ? "rgba(110, 242, 255, 0.8)" : "rgba(255, 142, 161, 0.8)";
+    const glowOuter = player.side === "left" ? "rgba(110, 242, 255, 0.28)" : "rgba(255, 142, 161, 0.28)";
+    for (const tip of tips) {
+      const tipX = tip.x * overlay.width;
+      const tipY = tip.y * overlay.height;
+      const glow = overlayCtx.createRadialGradient(tipX, tipY, 0, tipX, tipY, 28);
+      glow.addColorStop(0, glowCore);
+      glow.addColorStop(0.45, glowOuter);
+      glow.addColorStop(1, "rgba(255, 255, 255, 0)");
+      overlayCtx.fillStyle = glow;
+      overlayCtx.beginPath();
+      overlayCtx.arc(tipX, tipY, 28, 0, Math.PI * 2);
+      overlayCtx.fill();
+
+      overlayCtx.fillStyle = "#ffffff";
+      overlayCtx.beginPath();
+      overlayCtx.arc(tipX, tipY, 7, 0, Math.PI * 2);
+      overlayCtx.fill();
+      overlayCtx.fillStyle = player.color;
+    }
+  }
+
   overlayCtx.font = "700 18px 'Space Grotesk', sans-serif";
   overlayCtx.fillText(player.id, player.smoothX * overlay.width - 12, player.smoothY * overlay.height - 34);
   overlayCtx.restore();
@@ -493,6 +591,7 @@ function getBallPalette() {
   if (!owner) {
     return {
       core: "#fff4aa",
+      overlayCore: "rgba(255, 244, 170, 0.45)",
       glow: "rgba(110, 242, 255, 0.34)",
       outer: "rgba(110, 242, 255, 0)"
     };
@@ -501,6 +600,7 @@ function getBallPalette() {
   if (owner.id === "P1") {
     return {
       core: "#6ef2ff",
+      overlayCore: "rgba(110, 242, 255, 0.42)",
       glow: "rgba(110, 242, 255, 0.45)",
       outer: "rgba(110, 242, 255, 0)"
     };
@@ -508,6 +608,7 @@ function getBallPalette() {
 
   return {
     core: "#ff8ea1",
+    overlayCore: "rgba(255, 142, 161, 0.42)",
     glow: "rgba(255, 142, 161, 0.45)",
     outer: "rgba(255, 142, 161, 0)"
   };
@@ -516,12 +617,12 @@ function getBallPalette() {
 function drawBallOverlay() {
   const ballX = gameState.ball.smoothX * overlay.width;
   const ballY = gameState.ball.smoothY * overlay.height;
-  const glow = (28 + gameState.ball.pulse * 28) * BALL_SCALE;
+  const glow = (18 + gameState.ball.pulse * 18) * BALL_SCALE;
   const palette = getBallPalette();
 
   const radial = overlayCtx.createRadialGradient(ballX, ballY, 0, ballX, ballY, glow);
-  radial.addColorStop(0, palette.core);
-  radial.addColorStop(0.45, palette.glow);
+  radial.addColorStop(0, palette.overlayCore);
+  radial.addColorStop(0.45, palette.glow.replace("0.45", "0.18").replace("0.34", "0.14"));
   radial.addColorStop(1, palette.outer);
   overlayCtx.fillStyle = radial;
   overlayCtx.beginPath();
@@ -592,31 +693,18 @@ function initThreeScene(container) {
   );
   ballGroup.add(wire);
 
-  const playerMarkers = players.map((player) => {
-    const marker = new THREE.Mesh(
-      new THREE.SphereGeometry(0.22, 24, 24),
-      new THREE.MeshBasicMaterial({
-        color: new THREE.Color(player.color),
-        transparent: true,
-        opacity: 0.82
-      })
-    );
-    scene.add(marker);
-    return marker;
-  });
-
   const leftGate = new THREE.Mesh(
     new THREE.BoxGeometry(0.14, 3.1, 1.2),
     new THREE.MeshBasicMaterial({ color: 0x6ef2ff, transparent: true, opacity: 0.22 })
   );
-  leftGate.position.set(-3.28, 0, 0);
+  leftGate.position.set(-2.9, 0, 0);
   scene.add(leftGate);
 
   const rightGate = new THREE.Mesh(
     new THREE.BoxGeometry(0.14, 3.1, 1.2),
     new THREE.MeshBasicMaterial({ color: 0xff8ea1, transparent: true, opacity: 0.22 })
   );
-  rightGate.position.set(3.28, 0, 0);
+  rightGate.position.set(2.9, 0, 0);
   scene.add(rightGate);
 
   const particlesGeometry = new THREE.BufferGeometry();
@@ -655,6 +743,8 @@ function initThreeScene(container) {
   scene.add(floor);
 
   const clock = new THREE.Clock();
+  const projectedBall = new THREE.Vector3();
+  const projectedDirection = new THREE.Vector3();
 
   function resize() {
     camera.aspect = container.clientWidth / container.clientHeight;
@@ -667,9 +757,15 @@ function initThreeScene(container) {
     controls.enabled = false;
     controls.update();
     const palette = getBallPalette();
+    const ndcX = gameState.ball.smoothX * 2 - 1;
+    const ndcY = 1 - gameState.ball.smoothY * 2;
 
-    ballGroup.position.x = (gameState.ball.smoothX - 0.5) * 6;
-    ballGroup.position.y = (0.5 - gameState.ball.smoothY) * 3.4;
+    projectedBall.set(ndcX, ndcY, 0.5).unproject(camera);
+    projectedDirection.copy(projectedBall).sub(camera.position).normalize();
+    const planeDistance = -camera.position.z / projectedDirection.z;
+
+    ballGroup.position.copy(camera.position).addScaledVector(projectedDirection, planeDistance);
+    ballGroup.position.z = 0;
 
     const pulseScale = 1 + gameState.ball.pulse * 0.34;
     ballGroup.scale.setScalar(THREE.MathUtils.lerp(ballGroup.scale.x, pulseScale, 0.12));
@@ -686,15 +782,6 @@ function initThreeScene(container) {
     particles.rotation.y = elapsed * 0.06;
     particles.rotation.x = elapsed * 0.03;
     particles.material.size = 0.028 + gameState.ball.pulse * 0.012;
-
-    playerMarkers.forEach((marker, index) => {
-      const player = players[index];
-      marker.position.x = (player.smoothX - 0.5) * 6;
-      marker.position.y = (0.5 - player.smoothY) * 3.4;
-      marker.position.z = 0.8;
-      marker.scale.setScalar(player.active ? 1 : 0.7);
-      marker.material.opacity = player.active ? 0.95 : 0.18;
-    });
 
     leftGate.material.opacity = players[0].active ? 0.24 : 0.12;
     rightGate.material.opacity = players[1].active ? 0.24 : 0.12;

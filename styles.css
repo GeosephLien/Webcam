@@ -201,6 +201,26 @@ body.is-webcam-active .stage-panel {
   gap: 10px;
 }
 
+.reset-button {
+  position: absolute;
+  z-index: 3;
+  top: 148px;
+  right: 18px;
+  padding: 7px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(4, 18, 24, 0.72);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.reset-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+}
+
 .score-card {
   min-width: 84px;
   padding: 10px 12px;
