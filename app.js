@@ -695,8 +695,8 @@ function initThreeScene(container) {
       marker.material.opacity = player.active ? 0.95 : 0.18;
     });
 
-    leftGate.material.opacity = 0;
-    rightGate.material.opacity = 0;
+    leftGate.material.opacity = players[0].active ? 0.24 : 0.12;
+    rightGate.material.opacity = players[1].active ? 0.24 : 0.12;
 
     renderer.render(scene, camera);
   }
