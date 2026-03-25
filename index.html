@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spatial Webcam 3D Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div class="hero-copy">
+      <p class="eyebrow">Webcam Spatial Interface</p>
+      <h1>雙人搶球 3D Webcam 遊戲</h1>
+      <p class="lede">
+        兩個人站在鏡頭前，各伸出一隻手。捏住中央能量球後甩向自己的得分區；對手也能捏住抄截。
+      </p>
+      <div class="controls">
+        <button id="startButton" type="button">啟動 Webcam 偵測</button>
+        <p id="statusText">等待啟動攝影機</p>
+      </div>
+      <ul class="tips">
+        <li>左半邊是 P1，右半邊是 P2。</li>
+        <li>捏合可抓球，放開時會依手勢速度甩出。</li>
+        <li>把球送進自己的得分區就能得 1 分。</li>
+      </ul>
+    </div>
+
+    <div class="stage-panel">
+      <div class="hud">
+        <span>LIVE TRACKING</span>
+        <span id="gestureText">NO HAND</span>
+      </div>
+      <div class="scoreboard">
+        <div class="score-card">
+          <span>P1</span>
+          <strong id="scoreLeft">0</strong>
+        </div>
+        <div class="score-card">
+          <span>P2</span>
+          <strong id="scoreRight">0</strong>
+        </div>
+      </div>
+      <p id="gameMessage" class="game-message">兩位玩家就位後，先捏住能量球的人取得控制權。</p>
+      <video id="webcam" playsinline muted></video>
+      <canvas id="overlay"></canvas>
+      <div id="scene"></div>
+    </div>
+  </div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
