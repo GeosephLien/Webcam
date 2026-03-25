@@ -69,7 +69,7 @@ const gameState = {
     vx: 0,
     vy: 0
   },
-  lastMessage: "兩位玩家就位後，先捏住能量球的人取得控制權。"
+  lastMessage: "Once both players are ready, whoever grabs the energy orb first takes control."
 };
 
 gameState.scoreEffect = {
@@ -83,31 +83,31 @@ gameState.hadTrackedHands = false;
 
 const threeState = initThreeScene(sceneRoot);
 
-statusText.textContent = "互動模組已載入，點擊按鈕啟動攝影機";
+statusText.textContent = "Interactive module loaded. Click the button to start the camera.";
 
 window.addEventListener("error", (event) => {
   if (!event.message) return;
-  statusText.textContent = `載入失敗: ${event.message}`;
+  statusText.textContent = `Load failed: ${event.message}`;
 });
 
 startButton.addEventListener("click", async () => {
   startButton.disabled = true;
-  startButton.textContent = "啟動中...";
+  startButton.textContent = "Starting...";
   document.body.classList.add("is-webcam-active");
 
   try {
     await ensureLandmarker();
     await setupCamera();
     resizeOverlay();
-    statusText.textContent = "雙人偵測進行中";
-    startButton.textContent = "Webcam 已啟動";
+    statusText.textContent = "Two-player tracking is active.";
+    startButton.textContent = "Webcam Active";
     animationLoop();
   } catch (error) {
     console.error(error);
     document.body.classList.remove("is-webcam-active");
     statusText.textContent = describeCameraError(error);
     startButton.disabled = false;
-    startButton.textContent = "重新啟動 Webcam 偵測";
+    startButton.textContent = "Restart Webcam Tracking";
   }
 });
 
@@ -119,7 +119,7 @@ window.addEventListener("resize", () => {
 async function ensureLandmarker() {
   if (handLandmarker) return;
 
-  statusText.textContent = "載入手勢模型...";
+  statusText.textContent = "Loading hand tracking model...";
   const vision = await FilesetResolver.forVisionTasks(
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
   );
@@ -135,7 +135,7 @@ async function ensureLandmarker() {
 }
 
 async function setupCamera() {
-  statusText.textContent = "要求攝影機權限...";
+  statusText.textContent = "Requesting camera permission...";
   webcamStream = await navigator.mediaDevices.getUserMedia({
     video: {
       facingMode: "user",
@@ -299,7 +299,7 @@ function updateGameState() {
       ) {
         gameState.owner = opponent.id;
         ball.stealCooldown = 18;
-        setMessage(`${opponent.id} 捏住抄截，持球權轉移`);
+        setMessage(`${opponent.id} stole the orb and took control.`);
       }
 
       if (owner.side === "left" && ball.x < 0.12) {
@@ -313,7 +313,7 @@ function updateGameState() {
         ball.vy = THREE.MathUtils.clamp(owner.velocityY * 2.8, -0.09, 0.09);
       }
       gameState.owner = null;
-      setMessage("甩球成功，能量球進入慣性滑行");
+      setMessage("Throw released. The energy orb is gliding freely.");
     }
   } else {
     let closestPlayer = null;
@@ -333,7 +333,7 @@ function updateGameState() {
       ball.stealCooldown = 12;
       ball.vx = 0;
       ball.vy = 0;
-      setMessage(`${closestPlayer.id} 已捏住能量球，甩向自己的得分區`);
+      setMessage(`${closestPlayer.id} grabbed the energy orb. Throw it toward your scoring zone.`);
     } else {
       ball.x += ball.vx;
       ball.y += ball.vy;
@@ -389,7 +389,7 @@ function scorePoint(player) {
   scoreLeft.textContent = String(players[0].score);
   scoreRight.textContent = String(players[1].score);
   triggerScoreEffect(player);
-  setMessage(`${player.id} 得分，目前比數 ${players[0].score} : ${players[1].score}`);
+  setMessage(`${player.id} scored. Current score: ${players[0].score} : ${players[1].score}`);
   gameState.owner = null;
   gameState.ball.x = 0.5;
   gameState.ball.y = 0.5;
@@ -734,16 +734,16 @@ function distance(ax, ay, bx, by) {
 }
 
 function describeCameraError(error) {
-  if (!error?.name) return "無法啟動攝影機或模型，請確認瀏覽器權限";
+  if (!error?.name) return "Unable to start the camera. Please check your device or browser settings.";
 
   const map = {
-    NotAllowedError: "攝影機權限被拒絕，請在瀏覽器網站權限中允許 Camera",
-    NotFoundError: "找不到可用攝影機裝置",
-    NotReadableError: "攝影機正在被其他程式使用中",
-    OverconstrainedError: "目前攝影機不支援要求的解析度"
+    NotAllowedError: "Camera access was denied. Please allow camera permission in your browser.",
+    NotFoundError: "No camera was found on this device.",
+    NotReadableError: "The camera is already in use by another application.",
+    OverconstrainedError: "The requested camera settings are not supported on this device."
   };
 
-  return map[error.name] ?? `攝影機啟動失敗: ${error.name}`;
+  return map[error.name] ?? `Camera error: ${error.name}`;
 }
 
 window.addEventListener("beforeunload", () => {
